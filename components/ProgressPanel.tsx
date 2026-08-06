@@ -11,6 +11,8 @@ export const AGENT_ICONS: Record<AgentId, IconName> = {
   tech: "code",
   secrets: "key",
   paths: "search",
+  ports: "server",
+  pentest: "target",
   cve: "alert",
 };
 

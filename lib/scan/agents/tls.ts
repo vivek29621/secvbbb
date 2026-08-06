@@ -64,8 +64,9 @@ export const tlsAgent: AgentDef = {
     const started = Date.now();
     const findings: Finding[] = [];
 
-    // Only meaningful over TLS
-    if (ctx.url.protocol !== "https:" && (ctx.homepage?.finalUrl ?? "").startsWith("http://")) {
+    // Only meaningful over TLS — skip when the target is plain HTTP
+    // (handles a null homepage too, e.g. when the fetch failed).
+    if (ctx.url.protocol !== "https:" && !ctx.homepage?.finalUrl.startsWith("https://")) {
       return {
         agent: "tls",
         status: "skipped",

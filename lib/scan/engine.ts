@@ -8,6 +8,8 @@ import { cookiesAgent } from "@/lib/scan/agents/cookies";
 import { techAgent } from "@/lib/scan/agents/tech";
 import { secretsAgent } from "@/lib/scan/agents/secrets";
 import { pathsAgent } from "@/lib/scan/agents/paths";
+import { portsAgent } from "@/lib/scan/agents/ports";
+import { pentestAgent } from "@/lib/scan/agents/pentest";
 import { cveAgent } from "@/lib/scan/agents/cve";
 import {
   countBySeverity,
@@ -109,9 +111,9 @@ export async function runScan(input: ScanInput, emit: EmitFn): Promise<ScanRepor
   // Phase A — independent of page content
   const phaseA = await runPhase([httpAgent, reconAgent, tlsAgent], ctx, t0 + 6500, emit);
 
-  // Phase B — depend on the homepage fetch (paths tolerates a null homepage)
+  // Phase B — depend on the homepage fetch (paths/ports/pentest tolerate a null homepage)
   const phaseB = await runPhase(
-    [headersAgent, cookiesAgent, techAgent, secretsAgent, pathsAgent],
+    [headersAgent, cookiesAgent, techAgent, secretsAgent, pathsAgent, portsAgent, pentestAgent],
     ctx,
     t0 + DEADLINE_MS,
     emit

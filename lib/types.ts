@@ -14,6 +14,8 @@ export type AgentId =
   | "tech"
   | "secrets"
   | "paths"
+  | "ports"
+  | "pentest"
   | "cve";
 
 export interface Finding {
@@ -185,7 +187,25 @@ export const AGENT_META: Record<AgentId, AgentMeta> = {
     description:
       "Probes common sensitive paths: .git, .env, backups, admin panels and debug endpoints. Runs only with explicit authorization.",
     passive: false,
-    checkCount: 14,
+    checkCount: 21,
+  },
+  ports: {
+    id: "ports",
+    name: "Port Agent",
+    tagline: "Nmap-style port & banner scan",
+    description:
+      "TCP-connects to 20 common internet-facing ports to map exposed services (SSH, databases, RDP, Redis…) and grabs service banners. Runs only with explicit authorization.",
+    passive: false,
+    checkCount: 20,
+  },
+  pentest: {
+    id: "pentest",
+    name: "Pentest Agent",
+    tagline: "Active exploit-style probes",
+    description:
+      "Light, non-destructive probes: HTTP method abuse (TRACE/PUT/DELETE), open redirects, reflected input (XSS marker) and CORS origin reflection. Runs only with explicit authorization.",
+    passive: false,
+    checkCount: 4,
   },
   cve: {
     id: "cve",
@@ -207,6 +227,8 @@ export const ALL_AGENT_IDS: AgentId[] = [
   "tech",
   "secrets",
   "paths",
+  "ports",
+  "pentest",
   "cve",
 ];
 

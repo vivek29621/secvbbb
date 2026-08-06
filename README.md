@@ -26,6 +26,8 @@ Inspired by the architecture of projects like [Vigolium](https://github.com/vigo
 | **Fingerprint** | Framework, CMS, server & 3rd-party tech detection | Passive |
 | **Secret** | AWS, Google, GitHub, Stripe, Slack keys & private keys in served content | Passive |
 | **Path** | `.git`/`.env` exposure, backups, admin panels, debug endpoints | **Active (opt-in)** |
+| **Port** | Nmap-style TCP scan of 20 common ports + service banners | **Active (opt-in)** |
+| **Pentest** | TRACE/PUT/DELETE audit, open redirects, reflected-XSS marker, CORS origin reflection | **Active (opt-in)** |
 | **CVE** | Known CVEs for fingerprinted versions via the [OSV database](https://osv.dev) | Passive |
 
 **Authorized use only.** Passive agents only observe what the site already exposes.

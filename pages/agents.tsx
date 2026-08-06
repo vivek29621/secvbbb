@@ -10,6 +10,8 @@ const AGENT_ICONS: Record<string, IconName> = {
   tech: "code",
   secrets: "key",
   paths: "search",
+  ports: "server",
+  pentest: "target",
   cve: "alert",
 };
 
@@ -50,6 +52,18 @@ const CHECK_SAMPLES: Record<string, string[]> = {
     "phpinfo / debug pages",
     "Admin & login panels",
     "robots.txt / sitemap / security.txt",
+  ],
+  ports: [
+    "TCP connect scan (20 ports)",
+    "Service banners",
+    "Database exposure",
+    "SSH / RDP / SMB exposure",
+  ],
+  pentest: [
+    "TRACE / PUT / DELETE audit",
+    "Open redirect probes",
+    "Reflected XSS marker",
+    "CORS origin reflection",
   ],
   cve: ["OSV database lookup", "Known CVEs in detected versions", "Severity from CVSS"],
 };

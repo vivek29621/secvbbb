@@ -6,8 +6,8 @@ import { AGENT_META, ALL_AGENT_IDS } from "@/lib/types";
 const FEATURES: { icon: IconName; title: string; desc: string }[] = [
   {
     icon: "layers",
-    title: "9 specialized agents",
-    desc: "Transport, DNS recon, headers, TLS, cookies, fingerprinting, secrets, path probing and CVE lookup run in parallel on every scan.",
+    title: "11 specialized agents",
+    desc: "Transport, DNS recon, headers, TLS, cookies, fingerprinting, secrets, path probing, port scanning, pentest probes and CVE lookup run in parallel on every scan.",
   },
   {
     icon: "sparkles",
@@ -57,8 +57,8 @@ export default function Home() {
             </span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-lg leading-7 text-slate-600">
-            Nine AI agents probe your site — headers, TLS, DNS/email posture, leaked secrets,
-            exposed paths and known CVEs — then write a prioritized fix-it report.
+            Eleven AI agents probe your site — headers, TLS, DNS/email posture, leaked secrets,
+            exposed paths, open ports and known CVEs — then write a prioritized fix-it report.
           </p>
         </div>
 
@@ -75,8 +75,8 @@ export default function Home() {
       {/* Stats */}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { value: "9", label: "security agents" },
-          { value: "70+", label: "individual checks" },
+          { value: "11", label: "security agents" },
+          { value: "130+", label: "individual checks" },
           { value: "0", label: "API keys required" },
           { value: "CWE", label: "mapped findings" },
         ].map((s) => (
@@ -192,6 +192,8 @@ const ICONS: Record<string, IconName> = {
   tech: "code",
   secrets: "key",
   paths: "search",
+  ports: "server",
+  pentest: "target",
   cve: "alert",
 };
 
