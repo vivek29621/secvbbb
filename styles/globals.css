@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
+::selection {
+  @apply bg-blue-600 text-white;
+}
+
+/* Slim scrollbars for finding lists */
+.nice-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-300;
+}
+.nice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Faint blueprint grid used on the hero */
+.hero-grid {
+  background-image:
+    linear-gradient(to right, rgb(148 163 184 / 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+}

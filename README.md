@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VulnAgent
 
-## Getting Started
+**AI security agents that scan websites and write you a fix-it report.**
 
-First, run the development server:
+VulnAgent dispatches a team of specialized agents against any website you own (or are
+authorized to test). Agents run in parallel, stream live progress, and produce a
+severity-ranked report with an executive summary, CWE references, and a prioritized
+remediation plan — written by Google AI when a key is configured, or by a deterministic
+engine when it isn't.
+
+Inspired by the architecture of projects like [Vigolium](https://github.com/vigolium/vigolium)
+(deterministic scan modules + agentic AI analysis) and [BugTraceAI-CLI](https://github.com/BugTraceAI/BugTraceAI-CLI)
+(LLM + deterministic hybrid), built to be deployable in one click with zero keys.
+
+## The agents
+
+| Agent | Discipline | Mode |
+|---|---|---|
+| **Transport** | Homepage fetch, redirect chain, HTTPS enforcement | Passive |
+| **Recon** | DNS records, SPF, DMARC, MX (via Google Public DNS) | Passive |
+| **Headers** | CSP, HSTS, X-Frame-Options, Referrer-Policy, CORS, disclosure | Passive |
+| **TLS** | Certificate expiry, self-signed, hostname match, protocol version | Passive |
+| **Cookie** | Secure / HttpOnly / SameSite flag audit | Passive |
+| **Fingerprint** | Framework, CMS, server & 3rd-party tech detection | Passive |
+| **Secret** | AWS, Google, GitHub, Stripe, Slack keys & private keys in served content | Passive |
+| **Path** | `.git`/`.env` exposure, backups, admin panels, debug endpoints | **Active (opt-in)** |
+| **CVE** | Known CVEs for fingerprinted versions via the [OSV database](https://osv.dev) | Passive |
+
+**Authorized use only.** Passive agents only observe what the site already exposes.
+The Path agent actively probes sensitive paths *only* when you check the authorization
+box on the scan form.
+
+## Stack
+
+- Next.js 16 (Pages Router) · React 19 · TypeScript · Tailwind CSS v4
+- Zero runtime dependencies — DNS via `dns.google` JSON API, CVEs via `api.osv.dev`,
+  AI via the Google AI REST API (`gemini-1.5-flash`), no SDK needed
+- Scan history persisted in `localStorage` (no backend required)
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+```bash
+npm run lint
+npm run build
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Google AI (optional)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_GOOGLE_AI_API_KEY`
+(free key at <https://aistudio.google.com/apikey>). Without it, everything still
+works — summaries and chat answers are generated deterministically from the real
+findings and labeled as such.
 
-## Learn More
+## API
 
-To learn more about Next.js, take a look at the following resources:
+- `POST /api/scan` `{ url, activeProbe }` → SSE stream of agent events, ending with the report
+- `POST /api/ask` `{ question, report }` → `{ answer, simulated }`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Push to GitHub and import into Vercel — no environment variables required.
+Note: on Vercel's free tier (10s function limit) the slowest checks of a full
+active scan can time out; locally everything runs to completion.
 
-## Deploy on Vercel
+## Disclaimer
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+VulnAgent is a self-assessment tool. It performs non-intrusive checks and, with your
+confirmation, light active probing. You may only scan systems you own or have explicit
+written authorization to test. Findings are advisory and never a substitute for a
+professional penetration test. The authors assume no liability for misuse.
