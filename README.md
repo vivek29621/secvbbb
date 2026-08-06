@@ -2,6 +2,8 @@
 
 **AI security agents that scan websites and write you a fix-it report.**
 
+> 🟢 **Live at [vuln-agent-nu.vercel.app](https://vuln-agent-nu.vercel.app)** — deployed on Vercel, auto-deploys on every push to `main`.
+
 VulnAgent dispatches a team of specialized agents against any website you own (or are
 authorized to test). Agents run in parallel, stream live progress, and produce a
 severity-ranked report with an executive summary, CWE references, and a prioritized
