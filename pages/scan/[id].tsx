@@ -6,8 +6,9 @@ import FindingCard from "@/components/FindingCard";
 import Icon from "@/components/Icons";
 import ProgressPanel, { AGENT_ICONS } from "@/components/ProgressPanel";
 import ScoreRing from "@/components/ScoreRing";
+import { startScan } from "@/lib/clientScan";
 import { getReport, saveReport } from "@/lib/storage";
-import { AGENT_META, SEVERITY_ORDER } from "@/lib/types";
+import { AGENT_META, ALL_AGENT_IDS, SEVERITY_ORDER } from "@/lib/types";
 import type { AgentId, AgentResult, ScanEvent, ScanReport, Severity } from "@/lib/types";
 
 type Phase = "idle" | "scanning" | "done" | "error";
@@ -18,6 +19,13 @@ export default function ScanPage() {
   const id = typeof router.query.id === "string" ? router.query.id : "";
   const url = typeof router.query.url === "string" ? router.query.url : "";
   const active = router.query.active === "1";
+  const agentParam =
+    typeof router.query.agents === "string" ? router.query.agents : "";
+  const selectedAgents: AgentId[] = agentParam
+    ? agentParam
+        .split(",")
+        .filter((a): a is AgentId => ALL_AGENT_IDS.includes(a as AgentId))
+    : ALL_AGENT_IDS;
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [report, setReport] = useState<ScanReport | null>(null);
@@ -55,41 +63,18 @@ export default function ScanPage() {
       setStarted([]);
       setScanError("");
       try {
-        const res = await fetch("/api/scan", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ url: target, activeProbe: probe }),
+        await startScan({
+          url: target,
+          activeProbe: probe,
+          agents: selectedAgents.length === ALL_AGENT_IDS.length ? undefined : selectedAgents,
+          onEvent: handleEvent,
         });
-        if (!res.ok || !res.body) {
-          const j = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(j?.error ?? "Scan failed to start.");
-        }
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = "";
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          const chunks = buf.split("\n\n");
-          buf = chunks.pop() ?? "";
-          for (const chunk of chunks) {
-            for (const line of chunk.split("\n")) {
-              if (!line.startsWith("data: ")) continue;
-              try {
-                handleEvent(JSON.parse(line.slice(6)) as ScanEvent);
-              } catch {
-                /* skip malformed event */
-              }
-            }
-          }
-        }
       } catch (err) {
         setScanError(err instanceof Error ? err.message : "Scan failed — please try again.");
         setPhase("error");
       }
     },
-    [handleEvent]
+    [handleEvent, selectedAgents]
   );
 
   useEffect(() => {
@@ -159,7 +144,11 @@ export default function ScanPage() {
             </p>
           </div>
         </header>
-        <ProgressPanel results={results} started={new Set(started)} />
+        <ProgressPanel
+          results={results}
+          started={new Set(started)}
+          agents={selectedAgents}
+        />
         <p className="text-center text-xs text-slate-400">
           Agent findings stream in live — this window updates as each agent reports.
         </p>

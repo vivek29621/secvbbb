@@ -1,101 +1,313 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import AgentGrid from "@/components/AgentGrid";
+import DeployPanel, { type ScanMode } from "@/components/DeployPanel";
 import Icon, { type IconName } from "@/components/Icons";
-import ScanForm from "@/components/ScanForm";
-import { AGENT_META, ALL_AGENT_IDS } from "@/lib/types";
+import ScoreRing from "@/components/ScoreRing";
+import SeverityBadge from "@/components/SeverityBadge";
+import { startScan } from "@/lib/clientScan";
+import { saveReport } from "@/lib/storage";
+import { ALL_AGENT_IDS, SEVERITY_ORDER } from "@/lib/types";
+import type { AgentId, AgentResult, ScanEvent, ScanReport } from "@/lib/types";
+
+type Phase = "idle" | "scanning" | "done" | "error";
+
+const ACTIVE_AGENTS: AgentId[] = ["paths", "ports", "pentest"];
 
 const FEATURES: { icon: IconName; title: string; desc: string }[] = [
   {
     icon: "layers",
-    title: "11 specialized agents",
-    desc: "Transport, DNS recon, headers, TLS, cookies, fingerprinting, secrets, path probing, port scanning, pentest probes and CVE lookup run in parallel on every scan.",
+    title: "One URL in, full report out",
+    desc: "No account, no keys, no dashboards to learn. Paste a URL you own and the team deploys.",
   },
   {
     icon: "sparkles",
-    title: "AI-written reports",
-    desc: "An executive summary and prioritized remediation plan, grounded strictly in the real findings — Google AI when available, deterministic otherwise.",
+    title: "AI-written remediation",
+    desc: "An executive summary and prioritized fix-it plan, grounded strictly in the real findings.",
   },
   {
     icon: "shield",
-    title: "Zero setup, zero keys",
-    desc: "No account, no install. DNS, TLS and CVE checks use free public APIs. Add a Google AI key only if you want richer analysis.",
-  },
-];
-
-const STEPS: { icon: IconName; title: string; desc: string }[] = [
-  {
-    icon: "target",
-    title: "Point",
-    desc: "Paste the URL of a site you own or are authorized to test.",
-  },
-  {
-    icon: "activity",
-    title: "Scan",
-    desc: "Agents fan out — live progress, per-agent findings, no waiting on a single queue.",
-  },
-  {
-    icon: "file",
-    title: "Act",
-    desc: "Read the score, severity-ranked findings and AI remediation plan. Export and re-scan anytime.",
+    title: "Authorized-use only",
+    desc: "Passive by default. Active probes (paths, ports, pentest) need your authorization — confirm and the full team unlocks.",
   },
 ];
 
 export default function Home() {
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [mode, setMode] = useState<ScanMode>("passive");
+  const [selected, setSelected] = useState<Set<AgentId>>(new Set(ALL_AGENT_IDS));
+  const [report, setReport] = useState<ScanReport | null>(null);
+  const [results, setResults] = useState<Partial<Record<AgentId, AgentResult>>>({});
+  const [started, setStarted] = useState<AgentId[]>([]);
+  const [scanError, setScanError] = useState("");
+  const [lastUrl, setLastUrl] = useState("");
+  const reportRef = useRef<HTMLDivElement | null>(null);
+
+  const handleEvent = useCallback((e: ScanEvent) => {
+    switch (e.type) {
+      case "agent-start":
+        setStarted((s) => (s.includes(e.agent) ? s : [...s, e.agent]));
+        break;
+      case "agent-done":
+        setResults((r) => ({ ...r, [e.agent]: e.result }));
+        break;
+      case "done":
+        saveReport(e.report);
+        setReport(e.report);
+        setPhase("done");
+        break;
+      case "error":
+        setScanError(e.message);
+        setPhase("error");
+        break;
+    }
+  }, []);
+
+  const deploy = useCallback(
+    async (url: string, m: ScanMode) => {
+      setLastUrl(url);
+      setMode(m);
+      setPhase("scanning");
+      setReport(null);
+      setResults({});
+      setStarted([]);
+      setScanError("");
+      try {
+        await startScan({
+          url,
+          activeProbe: m === "full",
+          agents: [...selected],
+          onEvent: handleEvent,
+        });
+      } catch (err) {
+        setScanError(err instanceof Error ? err.message : "Scan failed — please try again.");
+        setPhase("error");
+      }
+    },
+    [selected, handleEvent]
+  );
+
+  const reset = () => {
+    setPhase("idle");
+    setReport(null);
+    setResults({});
+    setStarted([]);
+    setScanError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    if (phase === "done" && reportRef.current) {
+      reportRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [phase]);
+
+  const locked: AgentId[] = ["http", ...(mode === "passive" ? ACTIVE_AGENTS : [])];
+  const running = phase === "scanning";
+
   return (
-    <div className="space-y-20">
-      {/* Hero */}
-      <section className="relative">
-        <div className="hero-grid pointer-events-none absolute inset-0 -z-10 rounded-3xl" />
-        <div className="mx-auto max-w-3xl pt-10 text-center sm:pt-16">
-          <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-blue-700">
-            <Icon name="shield-check" className="h-3.5 w-3.5" />
-            AI security agents · open source · authorized-use only
-          </span>
-          <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-            Scan your website like a{" "}
-            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              security team
+    <div className="space-y-16">
+      {/* ============ MISSION CONTROL HERO ============ */}
+      <section className="relative overflow-hidden rounded-3xl bg-slate-950 shadow-2xl">
+        {/* glows + grid */}
+        <div className="hero-grid-dark pointer-events-none absolute inset-0" />
+        <div className="pointer-events-none absolute -top-32 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-blue-600/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 -right-24 h-72 w-72 rounded-full bg-indigo-600/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-4xl px-5 py-12 sm:px-10 sm:py-16">
+          {/* status strip */}
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <span className="mono-label inline-flex items-center gap-2 text-[11px] font-semibold text-emerald-400">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              {running ? "MISSION IN PROGRESS" : phase === "done" ? "MISSION COMPLETE" : "11 AGENTS ONLINE"}
             </span>
+            <span className="mono-label text-[11px] font-medium text-slate-500">
+              {running || phase === "done" ? `TARGET: ${lastUrl || "…"}` : "STANDBY · AWAITING TARGET"}
+            </span>
+          </div>
+
+          <h1 className="mt-5 text-center text-4xl font-bold tracking-tight text-white sm:text-5xl">
+            One URL. <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Eleven agents.</span>
+            <br />
+            A full security mission.
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-lg leading-7 text-slate-600">
-            Eleven AI agents probe your site — headers, TLS, DNS/email posture, leaked secrets,
-            exposed paths, open ports and known CVEs — then write a prioritized fix-it report.
+          <p className="mx-auto mt-4 max-w-2xl text-center text-base leading-7 text-slate-400">
+            VulnAgent deploys a team of 11 specialized AI security agents — transport, DNS recon,
+            headers, TLS, cookies, fingerprinting, secrets, paths, ports, pentest, CVE — that probe
+            your site in parallel and report back with a prioritized fix-it plan.
           </p>
-        </div>
 
-        <div className="mx-auto mt-10 max-w-2xl">
-          <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-xl shadow-slate-200/60 backdrop-blur sm:p-6">
-            <ScanForm />
+          {/* stats chips */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            {[
+              { value: "11", label: "agents" },
+              { value: "130+", label: "checks" },
+              { value: "0", label: "keys needed" },
+              { value: "CWE", label: "mapped" },
+            ].map((s) => (
+              <span
+                key={s.label}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-slate-300"
+              >
+                <span className="font-bold text-white">{s.value}</span>
+                {s.label}
+              </span>
+            ))}
           </div>
-          <p className="mt-3 text-center text-xs text-slate-400">
-            Passive checks only, unless you confirm authorization for active path probing.
-          </p>
+
+          {/* deploy panel */}
+          <div className="mx-auto mt-8 max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+            <DeployPanel
+              mode={mode}
+              onModeChange={setMode}
+              onDeploy={(url, m) => void deploy(url, m)}
+              deploying={running}
+              selectedCount={selected.size}
+            />
+          </div>
+
+          {/* team grid */}
+          <div className="mx-auto mt-8 max-w-3xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="mono-label text-[11px] font-semibold text-slate-500">
+                AGENT TEAM · {selected.size}/{ALL_AGENT_IDS.length} DEPLOYED
+              </p>
+              {!running && phase === "idle" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelected(selected.size === ALL_AGENT_IDS.length ? new Set() : new Set(ALL_AGENT_IDS))
+                  }
+                  className="text-xs font-semibold text-blue-400 transition hover:text-blue-300"
+                >
+                  {selected.size === ALL_AGENT_IDS.length ? "Deselect all" : "Select all"}
+                </button>
+              )}
+            </div>
+            <AgentGrid
+              agents={ALL_AGENT_IDS}
+              selected={selected}
+              onToggle={(id) => {
+                if (locked.includes(id)) return;
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                });
+              }}
+              selectable={!running && phase === "idle"}
+              results={results}
+              started={started}
+              dark
+              locked={locked}
+            />
+            {mode === "passive" && phase === "idle" && (
+              <p className="mt-3 text-center text-xs text-slate-500">
+                <Icon name="lock" className="mr-1 inline h-3 w-3" />
+                Path, Port and Pentest agents unlock with <span className="font-semibold text-slate-300">Full mission</span>.
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          { value: "11", label: "security agents" },
-          { value: "130+", label: "individual checks" },
-          { value: "0", label: "API keys required" },
-          { value: "CWE", label: "mapped findings" },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-6 text-center shadow-sm"
+      {/* ============ INLINE RESULTS ============ */}
+      {phase === "error" && (
+        <div className="mx-auto max-w-2xl rounded-3xl border border-red-200 bg-red-50 p-8 text-center">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+            <Icon name="x-circle" className="h-6 w-6" />
+          </span>
+          <h2 className="mt-3 text-lg font-semibold text-slate-900">Mission aborted</h2>
+          <p className="mt-1 text-sm text-slate-600">{scanError}</p>
+          <button
+            onClick={reset}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
           >
-            <p className="text-3xl font-bold tracking-tight text-slate-900">{s.value}</p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">
-              {s.label}
-            </p>
-          </div>
-        ))}
-      </section>
+            <Icon name="refresh" className="h-4 w-4" />
+            Try again
+          </button>
+        </div>
+      )}
 
-      {/* Features */}
+      {phase === "done" && report && (
+        <div ref={reportRef} className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-wrap items-center gap-6">
+            <ScoreRing score={report.score} grade={report.grade} size={104} />
+            <div className="min-w-0 flex-1">
+              <p className="mono-label text-[11px] font-semibold text-emerald-600">
+                MISSION COMPLETE · {(report.durationMs / 1000).toFixed(1)}s
+              </p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                {report.hostname}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {report.totalFindings} finding{report.totalFindings === 1 ? "" : "s"} ·{" "}
+                {report.agents.length} agents deployed
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {SEVERITY_ORDER.map((s) => (
+                  <SeverityBadge key={s} severity={s} />
+                ))}
+                <span className="ml-1 self-center text-xs font-semibold text-slate-500">
+                  {report.counts.critical} / {report.counts.high} / {report.counts.medium} /{" "}
+                  {report.counts.low} / {report.counts.info}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Link
+                href={`/scan/${report.id}`}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                Open full report
+                <Icon name="arrow-right" className="h-4 w-4" />
+              </Link>
+              <button
+                onClick={reset}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+              >
+                <Icon name="refresh" className="h-4 w-4" />
+                New mission
+              </button>
+            </div>
+          </div>
+
+          {report.findings.length > 0 ? (
+            <ul className="mt-6 space-y-2">
+              {report.findings.slice(0, 5).map((f) => (
+                <li
+                  key={f.id}
+                  className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3"
+                >
+                  <SeverityBadge severity={f.severity} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
+                    {f.title}
+                  </span>
+                </li>
+              ))}
+              {report.findings.length > 5 && (
+                <li className="px-1 text-xs text-slate-400">
+                  + {report.findings.length - 5} more — see the full report
+                </li>
+              )}
+            </ul>
+          ) : (
+            <div className="mt-6 flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+              <Icon name="check-circle" className="h-5 w-5 text-emerald-600" />
+              <p className="text-sm text-emerald-800">Every check came back clean. Re-scan regularly.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============ WHY ============ */}
       <section>
         <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-          Built like a real security assessment
+          A security team, minus the headcount
         </h2>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {FEATURES.map((f) => (
@@ -113,66 +325,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Agent roster preview */}
-      <section>
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">The agent roster</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Each agent owns one discipline. They run in parallel and report back per-finding.
-            </p>
-          </div>
-          <Link
-            href="/agents"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700"
-          >
-            All agents <Icon name="arrow-right" className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {ALL_AGENT_IDS.slice(0, 6).map((id) => {
-            const a = AGENT_META[id];
-            return (
-              <Link
-                key={id}
-                href="/agents"
-                className="group flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <span
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                    a.passive ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                  }`}
-                >
-                  <Icon name={iconFor(id)} className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900">{a.name}</p>
-                  <p className="truncate text-xs text-slate-500">{a.tagline}</p>
-                </div>
-                <Icon
-                  name="arrow-right"
-                  className="ml-auto h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-blue-500"
-                />
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* How it works */}
+      {/* ============ HOW IT WORKS ============ */}
       <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
         <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-          Zero to report in three steps
+          Deploy in three steps
         </h2>
         <div className="mt-8 grid gap-8 sm:grid-cols-3">
-          {STEPS.map((s, i) => (
+          {[
+            { icon: "target" as IconName, title: "Point", desc: "Paste a URL you own or are authorized to test." },
+            { icon: "activity" as IconName, title: "Deploy", desc: "Pick the team (all 11 by default), choose Passive or Full mission, and hit deploy." },
+            { icon: "file" as IconName, title: "Act", desc: "Watch agents work live, then read the score, findings and AI remediation plan." },
+          ].map((s, i) => (
             <div key={s.title} className="relative text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
                 <Icon name={s.icon} className="h-5 w-5" />
               </div>
-              <p className="mt-3 text-xs font-bold uppercase tracking-wider text-blue-600">
-                Step {i + 1}
-              </p>
+              <p className="mt-3 text-xs font-bold uppercase tracking-wider text-blue-600">Step {i + 1}</p>
               <h3 className="mt-1 text-base font-semibold text-slate-900">{s.title}</h3>
               <p className="mx-auto mt-1.5 max-w-xs text-sm leading-6 text-slate-600">{s.desc}</p>
             </div>
@@ -181,22 +349,4 @@ export default function Home() {
       </section>
     </div>
   );
-}
-
-const ICONS: Record<string, IconName> = {
-  http: "globe",
-  recon: "network",
-  headers: "shield",
-  tls: "lock",
-  cookies: "cookie",
-  tech: "code",
-  secrets: "key",
-  paths: "search",
-  ports: "server",
-  pentest: "target",
-  cve: "alert",
-};
-
-function iconFor(id: string): IconName {
-  return ICONS[id] ?? "shield";
 }

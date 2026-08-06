@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { runScan } from "@/lib/scan/engine";
-import type { ScanEvent } from "@/lib/types";
+import { ALL_AGENT_IDS } from "@/lib/types";
+import type { AgentId, ScanEvent } from "@/lib/types";
 
 export const config = {
   api: {
@@ -22,11 +23,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
-  const { url, activeProbe } = (req.body ?? {}) as { url?: unknown; activeProbe?: unknown };
+  const { url, activeProbe, agents } = (req.body ?? {}) as {
+    url?: unknown;
+    activeProbe?: unknown;
+    agents?: unknown;
+  };
   if (typeof url !== "string" || !url.trim()) {
     res.status(400).json({ error: "A target URL is required." });
     return;
   }
+  const agentList: AgentId[] | undefined = Array.isArray(agents)
+    ? agents.filter(
+        (a): a is AgentId => typeof a === "string" && ALL_AGENT_IDS.includes(a as AgentId)
+      )
+    : undefined;
 
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -43,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
 
   try {
-    const report = await runScan({ url, activeProbe: activeProbe === true }, send);
+    const report = await runScan({ url, activeProbe: activeProbe === true, agents: agentList }, send);
     send({ type: "done", report });
   } catch (err) {
     send({

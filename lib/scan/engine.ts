@@ -18,11 +18,14 @@ import {
   sortFindings,
 } from "@/lib/scan/scoring";
 import { writeAiReport } from "@/lib/ai/reportWriter";
-import type { AgentResult, ScanEvent, ScanReport } from "@/lib/types";
+import { ALL_AGENT_IDS } from "@/lib/types";
+import type { AgentId, AgentResult, ScanEvent, ScanReport } from "@/lib/types";
 
 export interface ScanInput {
   url: string;
   activeProbe: boolean;
+  /** Optional subset of agents to deploy. Empty/undefined = all agents. */
+  agents?: AgentId[];
 }
 
 export type EmitFn = (event: ScanEvent) => void;
@@ -108,19 +111,38 @@ export async function runScan(input: ScanInput, emit: EmitFn): Promise<ScanRepor
     technologies: [],
   };
 
+  // Team selection — the Transport agent always runs (it fetches the page
+  // every homepage-dependent agent needs); other agents filter to the pick.
+  const wanted = new Set<AgentId>(
+    (input.agents ?? []).filter((a): a is AgentId => ALL_AGENT_IDS.includes(a))
+  );
+  const include = (id: AgentId) => wanted.size === 0 || wanted.has(id) || id === "http";
+
   // Phase A — independent of page content
-  const phaseA = await runPhase([httpAgent, reconAgent, tlsAgent], ctx, t0 + 6500, emit);
+  const phaseA = await runPhase(
+    [httpAgent, reconAgent, tlsAgent].filter((d) => include(d.id)),
+    ctx,
+    t0 + 6500,
+    emit
+  );
 
   // Phase B — depend on the homepage fetch (paths/ports/pentest tolerate a null homepage)
   const phaseB = await runPhase(
-    [headersAgent, cookiesAgent, techAgent, secretsAgent, pathsAgent, portsAgent, pentestAgent],
+    [headersAgent, cookiesAgent, techAgent, secretsAgent, pathsAgent, portsAgent, pentestAgent].filter(
+      (d) => include(d.id)
+    ),
     ctx,
     t0 + DEADLINE_MS,
     emit
   );
 
   // Phase C — needs the Fingerprint agent's results
-  const phaseC = await runPhase([cveAgent], ctx, t0 + DEADLINE_MS, emit);
+  const phaseC = await runPhase(
+    [cveAgent].filter((d) => include(d.id)),
+    ctx,
+    t0 + DEADLINE_MS,
+    emit
+  );
 
   const agents = [...phaseA, ...phaseB, ...phaseC];
   const findings = sortFindings(agents.flatMap((r) => r.findings));

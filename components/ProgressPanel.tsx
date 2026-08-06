@@ -19,9 +19,12 @@ export const AGENT_ICONS: Record<AgentId, IconName> = {
 export default function ProgressPanel({
   results,
   started,
+  agents = ALL_AGENT_IDS,
 }: {
   results: Partial<Record<AgentId, AgentResult>>;
   started: Set<AgentId>;
+  /** Which agents to render (default: all). */
+  agents?: AgentId[];
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -33,12 +36,12 @@ export default function ProgressPanel({
           </span>
           <h2 className="text-sm font-semibold text-slate-900">Agents at work</h2>
           <span className="ml-auto text-xs font-medium text-slate-500">
-            {Object.keys(results).length} / {ALL_AGENT_IDS.length} complete
+            {Object.keys(results).length} / {agents.length} complete
           </span>
         </div>
       </div>
       <ul className="divide-y divide-slate-50">
-        {ALL_AGENT_IDS.map((id) => {
+        {agents.map((id) => {
           const meta = AGENT_META[id];
           const result = results[id];
           const running = started.has(id) && !result;

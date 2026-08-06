@@ -48,6 +48,11 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
+Scan straight from the landing page: paste a URL, pick your team (all 11 agents by
+default — click cards to customize), choose **Passive recon** or **Full mission**
+(active probes, requires the authorization checkbox), and hit deploy. Agents light
+up live as they work and the report renders inline; saved to History too.
+
 ```bash
 npm run lint
 npm run build

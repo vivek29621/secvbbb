@@ -40,3 +40,17 @@ body {
     linear-gradient(to bottom, rgb(148 163 184 / 0.08) 1px, transparent 1px);
   background-size: 32px 32px;
 }
+
+/* Dark mission-control grid */
+.hero-grid-dark {
+  background-image:
+    linear-gradient(to right, rgb(148 163 184 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Mono status text for the mission strip */
+.mono-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.14em;
+}
