@@ -1,5 +1,10 @@
 import type { AgentId, ScanEvent } from "@/lib/types";
 
+/** Minimum visible mission duration — the report reveal waits for this so the
+ *  agent team is seen working even when every check finishes in milliseconds.
+ *  Results are real; this is presentation pacing only. */
+export const MIN_MISSION_MS = 5000;
+
 /**
  * Client-side SSE runner for /api/scan. Reads the event stream and forwards
  * each parsed ScanEvent to onEvent as it arrives.

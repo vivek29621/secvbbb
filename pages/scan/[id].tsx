@@ -6,7 +6,7 @@ import FindingCard from "@/components/FindingCard";
 import Icon from "@/components/Icons";
 import ProgressPanel, { AGENT_ICONS } from "@/components/ProgressPanel";
 import ScoreRing from "@/components/ScoreRing";
-import { startScan } from "@/lib/clientScan";
+import { startScan, MIN_MISSION_MS } from "@/lib/clientScan";
 import { getReport, saveReport } from "@/lib/storage";
 import { AGENT_META, ALL_AGENT_IDS, SEVERITY_ORDER } from "@/lib/types";
 import type { AgentId, AgentResult, ScanEvent, ScanReport, Severity } from "@/lib/types";
@@ -34,6 +34,9 @@ export default function ScanPage() {
   const [scanError, setScanError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const startedRef = useRef(false);
+  const startedAtRef = useRef(0);
+  const revealTimerRef = useRef<number | null>(null);
+  const pendingReportRef = useRef<ScanReport | null>(null);
 
   const handleEvent = useCallback((event: ScanEvent) => {
     switch (event.type) {
@@ -43,11 +46,19 @@ export default function ScanPage() {
       case "agent-done":
         setResults((r) => ({ ...r, [event.agent]: event.result }));
         break;
-      case "done":
+      case "done": {
         saveReport(event.report);
-        setReport(event.report);
-        setPhase("done");
+        pendingReportRef.current = event.report;
+        // Hold the reveal until the minimum mission duration has elapsed.
+        const elapsed = Date.now() - startedAtRef.current;
+        const delay = Math.max(0, MIN_MISSION_MS - elapsed);
+        if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
+        revealTimerRef.current = window.setTimeout(() => {
+          setReport(pendingReportRef.current);
+          setPhase("done");
+        }, delay);
         break;
+      }
       case "error":
         setScanError(event.message);
         setPhase("error");
@@ -62,6 +73,7 @@ export default function ScanPage() {
       setResults({});
       setStarted([]);
       setScanError("");
+      startedAtRef.current = Date.now();
       try {
         await startScan({
           url: target,

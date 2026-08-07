@@ -5,7 +5,7 @@ import DeployPanel, { type ScanMode } from "@/components/DeployPanel";
 import Icon, { type IconName } from "@/components/Icons";
 import ScoreRing from "@/components/ScoreRing";
 import SeverityBadge from "@/components/SeverityBadge";
-import { startScan } from "@/lib/clientScan";
+import { startScan, MIN_MISSION_MS } from "@/lib/clientScan";
 import { saveReport } from "@/lib/storage";
 import { ALL_AGENT_IDS, SEVERITY_ORDER } from "@/lib/types";
 import type { AgentId, AgentResult, ScanEvent, ScanReport } from "@/lib/types";
@@ -42,6 +42,9 @@ export default function Home() {
   const [scanError, setScanError] = useState("");
   const [lastUrl, setLastUrl] = useState("");
   const reportRef = useRef<HTMLDivElement | null>(null);
+  const startedAtRef = useRef(0);
+  const revealTimerRef = useRef<number | null>(null);
+  const pendingReportRef = useRef<ScanReport | null>(null);
 
   const handleEvent = useCallback((e: ScanEvent) => {
     switch (e.type) {
@@ -51,11 +54,20 @@ export default function Home() {
       case "agent-done":
         setResults((r) => ({ ...r, [e.agent]: e.result }));
         break;
-      case "done":
+      case "done": {
         saveReport(e.report);
-        setReport(e.report);
-        setPhase("done");
+        pendingReportRef.current = e.report;
+        // Hold the reveal until the minimum mission duration has elapsed so
+        // the team is seen working even when every check finishes instantly.
+        const elapsed = Date.now() - startedAtRef.current;
+        const delay = Math.max(0, MIN_MISSION_MS - elapsed);
+        if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
+        revealTimerRef.current = window.setTimeout(() => {
+          setReport(pendingReportRef.current);
+          setPhase("done");
+        }, delay);
         break;
+      }
       case "error":
         setScanError(e.message);
         setPhase("error");
@@ -72,6 +84,7 @@ export default function Home() {
       setResults({});
       setStarted([]);
       setScanError("");
+      startedAtRef.current = Date.now();
       try {
         await startScan({
           url,
@@ -88,6 +101,7 @@ export default function Home() {
   );
 
   const reset = () => {
+    if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
     setPhase("idle");
     setReport(null);
     setResults({});

@@ -33,6 +33,11 @@ export type EmitFn = (event: ScanEvent) => void;
 /** Hard cap on total scan time (keeps serverless deploys within function limits). */
 const DEADLINE_MS = 9500;
 
+/** Delay between agent dispatches so the team visibly deploys one by one. */
+const AGENT_STAGGER_MS = 260;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
  * Normalize a user-supplied target into an absolute http(s) URL.
  * Throws with a human-readable message for invalid input.
@@ -89,12 +94,19 @@ async function runPhase(
   deadlineMs: number,
   emit: EmitFn
 ): Promise<AgentResult[]> {
-  for (const d of defs) emit({ type: "agent-start", agent: d.id });
-  const results = await Promise.all(
-    defs.map((d) => runAgentWithDeadline(d, ctx, deadlineMs))
+  // Dispatch one by one so the team visibly deploys (the runs themselves are parallel).
+  for (const d of defs) {
+    emit({ type: "agent-start", agent: d.id });
+    await sleep(AGENT_STAGGER_MS);
+  }
+  // Stream each agent's results as it finishes, not all at once.
+  return Promise.all(
+    defs.map(async (d) => {
+      const r = await runAgentWithDeadline(d, ctx, deadlineMs);
+      emit({ type: "agent-done", agent: r.agent, result: r });
+      return r;
+    })
   );
-  for (const r of results) emit({ type: "agent-done", agent: r.agent, result: r });
-  return results;
 }
 
 /** Run the full agent pipeline against a target and produce a ScanReport. */
