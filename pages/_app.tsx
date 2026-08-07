@@ -18,7 +18,7 @@ export default function App({ Component, pageProps }: AppProps) {
             verify before acting. Not a substitute for a professional penetration test.
           </p>
           <p className="mt-2 text-xs text-slate-400">
-            VulnAgent · open source · powered by Google AI (optional) · MIT
+            VulnAgent · open source · powered by Google AI
           </p>
         </div>
       </footer>

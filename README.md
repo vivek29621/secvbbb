@@ -58,7 +58,7 @@ npm run lint
 npm run build
 ```
 
-## Google AI (optional)
+## Google AI
 
 Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_GOOGLE_AI_API_KEY`
 (free key at <https://aistudio.google.com/apikey>). Without it, everything still
